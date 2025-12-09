@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/labstack/echo/v4"
+
 	"api-go-arquitetura/internal/config"
 )
 
@@ -15,47 +17,48 @@ func SetCORSConfig(cfg *config.Config) {
 }
 
 // CORSMiddleware adiciona cabeçalhos CORS e responde OPTIONS
-func CORSMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Se não há configuração, usar padrão permissivo
-		if corsConfig == nil {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		} else {
-			// Configurar origem
-			origin := r.Header.Get("Origin")
-			allowedOrigin := getAllowedOrigin(origin)
-			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
-
-			// Configurar métodos
-			if len(corsConfig.CORSAllowedMethods) > 0 {
-				w.Header().Set("Access-Control-Allow-Methods", strings.Join(corsConfig.CORSAllowedMethods, ", "))
+func CORSMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Se não há configuração, usar padrão permissivo
+			if corsConfig == nil {
+				c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+				c.Response().Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				c.Response().Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			} else {
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				// Configurar origem
+				origin := c.Request().Header.Get("Origin")
+				allowedOrigin := getAllowedOrigin(origin)
+				c.Response().Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+
+				// Configurar métodos
+				if len(corsConfig.CORSAllowedMethods) > 0 {
+					c.Response().Header().Set("Access-Control-Allow-Methods", strings.Join(corsConfig.CORSAllowedMethods, ", "))
+				} else {
+					c.Response().Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				}
+
+				// Configurar headers
+				if len(corsConfig.CORSAllowedHeaders) > 0 {
+					c.Response().Header().Set("Access-Control-Allow-Headers", strings.Join(corsConfig.CORSAllowedHeaders, ", "))
+				} else {
+					c.Response().Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+				}
+
+				// Configurar credenciais
+				if corsConfig.CORSCredentials {
+					c.Response().Header().Set("Access-Control-Allow-Credentials", "true")
+				}
 			}
 
-			// Configurar headers
-			if len(corsConfig.CORSAllowedHeaders) > 0 {
-				w.Header().Set("Access-Control-Allow-Headers", strings.Join(corsConfig.CORSAllowedHeaders, ", "))
-			} else {
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			// Responder a requisições OPTIONS
+			if c.Request().Method == http.MethodOptions {
+				return c.NoContent(http.StatusNoContent)
 			}
 
-			// Configurar credenciais
-			if corsConfig.CORSCredentials {
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-			}
+			return next(c)
 		}
-
-		// Responder a requisições OPTIONS
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	}
 }
 
 // getAllowedOrigin retorna a origem permitida baseada na configuração

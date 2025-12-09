@@ -20,7 +20,8 @@ import (
 	"api-go-arquitetura/internal/repository"
 	"api-go-arquitetura/internal/service"
 
-	httpSwagger "github.com/swaggo/http-swagger"
+	"github.com/labstack/echo/v4"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 // @title API Go com Arquitetura
@@ -116,25 +117,25 @@ func main() {
 	}
 	healthCheckHandler := handlers.NewHealthCheckHandler(healthCheckFunc)
 
-	// Criar router e injetar os handlers
-	router := api.NewRouter(produtoHandler, healthCheckHandler)
+	// Criar router Echo e injetar os handlers
+	e := api.NewRouter(produtoHandler, healthCheckHandler)
 
 	// Rota do Swagger
-	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// Rota de métricas Prometheus
-	router.Handle("/metrics", metrics.GetHandler()).Methods("GET")
+	e.GET("/metrics", echo.WrapHandler(metrics.GetHandler()))
 
 	// Configurar CORS
 	middleware.SetCORSConfig(&cfg)
 
 	// Aplicar middlewares
-	handler := middleware.ApplyMiddlewares(router)
+	middleware.ApplyMiddlewares(e)
 
 	// Configurar servidor HTTP usando configurações
 	srv := &http.Server{
 		Addr:         cfg.Port,
-		Handler:      handler,
+		Handler:      e,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 		IdleTimeout:  cfg.IdleTimeout,

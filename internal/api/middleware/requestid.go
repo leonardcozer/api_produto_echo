@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 )
 
 // ContextKey é o tipo usado para chaves do contexto
@@ -21,31 +21,33 @@ const (
 // - No header de resposta (X-Request-ID)
 // - No contexto da requisição
 // - Nos logs (através do contexto)
-func RequestIDMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verificar se já existe um request ID no header da requisição
-		requestID := r.Header.Get(RequestIDHeader)
-		
-		// Se não existir, gerar um novo UUID
-		if requestID == "" {
-			requestID = uuid.New().String()
+func RequestIDMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Verificar se já existe um request ID no header da requisição
+			requestID := c.Request().Header.Get(RequestIDHeader)
+			
+			// Se não existir, gerar um novo UUID
+			if requestID == "" {
+				requestID = uuid.New().String()
+			}
+			
+			// Adicionar o request ID no header de resposta
+			c.Response().Header().Set(RequestIDHeader, requestID)
+			
+			// Adicionar o request ID no contexto da requisição
+			ctx := context.WithValue(c.Request().Context(), RequestIDKey, requestID)
+			c.SetRequest(c.Request().WithContext(ctx))
+			
+			// Continuar com o próximo handler
+			return next(c)
 		}
-		
-		// Adicionar o request ID no header de resposta
-		w.Header().Set(RequestIDHeader, requestID)
-		
-		// Adicionar o request ID no contexto da requisição
-		ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
-		r = r.WithContext(ctx)
-		
-		// Continuar com o próximo handler
-		next.ServeHTTP(w, r)
-	})
+	}
 }
 
 // GetRequestID extrai o request ID do contexto da requisição
-func GetRequestID(r *http.Request) string {
-	if requestID, ok := r.Context().Value(RequestIDKey).(string); ok {
+func GetRequestID(c echo.Context) string {
+	if requestID, ok := c.Request().Context().Value(RequestIDKey).(string); ok {
 		return requestID
 	}
 	return ""

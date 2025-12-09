@@ -3,35 +3,36 @@ package api
 import (
 	"api-go-arquitetura/internal/api/handlers"
 
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
 )
 
-// NewRouter monta e retorna o router com as rotas registradas pelos handlers
-func NewRouter(produtoHandler *handlers.ProdutoHandler, healthCheckHandler *handlers.HealthCheckHandler) *mux.Router {
-	router := mux.NewRouter()
+// NewRouter monta e retorna o router Echo com as rotas registradas pelos handlers
+func NewRouter(produtoHandler *handlers.ProdutoHandler, healthCheckHandler *handlers.HealthCheckHandler) *echo.Echo {
+	e := echo.New()
 
 	// Rotas versionadas para produtos (v1)
-	v1 := router.PathPrefix("/api/v1").Subrouter()
-	v1.HandleFunc("/produtos", produtoHandler.GetProdutos).Methods("GET")
-	v1.HandleFunc("/produtos/{id}", produtoHandler.GetProduto).Methods("GET")
-	v1.HandleFunc("/produtos", produtoHandler.CreateProduto).Methods("POST")
-	v1.HandleFunc("/produtos/{id}", produtoHandler.UpdateProduto).Methods("PUT")
-	v1.HandleFunc("/produtos/{id}", produtoHandler.PatchProduto).Methods("PATCH")
-	v1.HandleFunc("/produtos/{id}", produtoHandler.DeleteProduto).Methods("DELETE")
+	v1 := e.Group("/api/v1")
+	v1.GET("/produtos", produtoHandler.GetProdutos)
+	v1.GET("/produtos/:id", produtoHandler.GetProduto)
+	v1.POST("/produtos", produtoHandler.CreateProduto)
+	v1.PUT("/produtos/:id", produtoHandler.UpdateProduto)
+	v1.PATCH("/produtos/:id", produtoHandler.PatchProduto)
+	v1.DELETE("/produtos/:id", produtoHandler.DeleteProduto)
 
 	// Manter compatibilidade com rotas antigas (redirecionar para v1)
 	// Isso permite uma transição suave para o versionamento
-	router.HandleFunc("/api/produtos", produtoHandler.GetProdutos).Methods("GET")
-	router.HandleFunc("/api/produtos/{id}", produtoHandler.GetProduto).Methods("GET")
-	router.HandleFunc("/api/produtos", produtoHandler.CreateProduto).Methods("POST")
-	router.HandleFunc("/api/produtos/{id}", produtoHandler.UpdateProduto).Methods("PUT")
-	router.HandleFunc("/api/produtos/{id}", produtoHandler.PatchProduto).Methods("PATCH")
-	router.HandleFunc("/api/produtos/{id}", produtoHandler.DeleteProduto).Methods("DELETE")
+	legacy := e.Group("/api")
+	legacy.GET("/produtos", produtoHandler.GetProdutos)
+	legacy.GET("/produtos/:id", produtoHandler.GetProduto)
+	legacy.POST("/produtos", produtoHandler.CreateProduto)
+	legacy.PUT("/produtos/:id", produtoHandler.UpdateProduto)
+	legacy.PATCH("/produtos/:id", produtoHandler.PatchProduto)
+	legacy.DELETE("/produtos/:id", produtoHandler.DeleteProduto)
 
 	// Rota de health check (não versionada)
 	if healthCheckHandler != nil {
-		router.HandleFunc("/health", healthCheckHandler.HealthCheck).Methods("GET")
+		e.GET("/health", healthCheckHandler.HealthCheck)
 	}
 
-	return router
+	return e
 }

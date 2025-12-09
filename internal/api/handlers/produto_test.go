@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
 
 	"api-go-arquitetura/internal/dto"
 	apiErrors "api-go-arquitetura/internal/errors"
@@ -89,6 +89,7 @@ func (m *MockProdutoService) Delete(ctx context.Context, id int) error {
 func TestProdutoHandler_CreateProduto(t *testing.T) {
 	mockService := NewMockProdutoService()
 	handler := NewProdutoHandler(mockService)
+	e := echo.New()
 
 	t.Run("deve criar produto com dados válidos", func(t *testing.T) {
 		requestBody := dto.CreateProdutoRequest{
@@ -100,16 +101,20 @@ func TestProdutoHandler_CreateProduto(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 		req := httptest.NewRequest("POST", "/api/produtos", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
 
-		handler.CreateProduto(w, req)
+		err := handler.CreateProduto(c)
+		if err != nil {
+			t.Fatalf("Erro inesperado: %v", err)
+		}
 
-		if w.Code != http.StatusCreated {
-			t.Errorf("Status esperado %d, obtido %d", http.StatusCreated, w.Code)
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Status esperado %d, obtido %d", http.StatusCreated, rec.Code)
 		}
 
 		var response dto.ProdutoResponse
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 			t.Fatalf("Erro ao decodificar resposta: %v", err)
 		}
 
@@ -127,13 +132,14 @@ func TestProdutoHandler_CreateProduto(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 		req := httptest.NewRequest("POST", "/api/produtos", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
 
-		handler.CreateProduto(w, req)
+		handler.CreateProduto(c)
 
 		// Pode ser 400 (Bad Request) ou 422 (Unprocessable Entity) dependendo da validação
-		if w.Code != http.StatusBadRequest && w.Code != http.StatusUnprocessableEntity {
-			t.Errorf("Status esperado %d ou %d, obtido %d", http.StatusBadRequest, http.StatusUnprocessableEntity, w.Code)
+		if rec.Code != http.StatusBadRequest && rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("Status esperado %d ou %d, obtido %d", http.StatusBadRequest, http.StatusUnprocessableEntity, rec.Code)
 		}
 	})
 }
@@ -141,6 +147,7 @@ func TestProdutoHandler_CreateProduto(t *testing.T) {
 func TestProdutoHandler_GetProduto(t *testing.T) {
 	mockService := NewMockProdutoService()
 	handler := NewProdutoHandler(mockService)
+	e := echo.New()
 
 	// Criar produto de teste
 	produto := model.Produto{
@@ -151,20 +158,24 @@ func TestProdutoHandler_GetProduto(t *testing.T) {
 	created, _ := mockService.Create(context.Background(), produto)
 
 	t.Run("deve retornar produto existente", func(t *testing.T) {
-		router := mux.NewRouter()
-		router.HandleFunc("/api/produtos/{id}", handler.GetProduto).Methods("GET")
-		
 		req := httptest.NewRequest("GET", "/api/produtos/1", nil)
-		w := httptest.NewRecorder()
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/produtos/:id")
+		c.SetParamNames("id")
+		c.SetParamValues("1")
 
-		router.ServeHTTP(w, req)
+		err := handler.GetProduto(c)
+		if err != nil {
+			t.Fatalf("Erro inesperado: %v", err)
+		}
 
-		if w.Code != http.StatusOK {
-			t.Errorf("Status esperado %d, obtido %d", http.StatusOK, w.Code)
+		if rec.Code != http.StatusOK {
+			t.Errorf("Status esperado %d, obtido %d", http.StatusOK, rec.Code)
 		}
 
 		var response dto.ProdutoResponse
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 			t.Fatalf("Erro ao decodificar resposta: %v", err)
 		}
 
@@ -174,30 +185,32 @@ func TestProdutoHandler_GetProduto(t *testing.T) {
 	})
 
 	t.Run("deve retornar erro quando produto não existe", func(t *testing.T) {
-		router := mux.NewRouter()
-		router.HandleFunc("/api/produtos/{id}", handler.GetProduto).Methods("GET")
-		
 		req := httptest.NewRequest("GET", "/api/produtos/999", nil)
-		w := httptest.NewRecorder()
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/produtos/:id")
+		c.SetParamNames("id")
+		c.SetParamValues("999")
 
-		router.ServeHTTP(w, req)
+		handler.GetProduto(c)
 
-		if w.Code != http.StatusNotFound {
-			t.Errorf("Status esperado %d, obtido %d", http.StatusNotFound, w.Code)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Status esperado %d, obtido %d", http.StatusNotFound, rec.Code)
 		}
 	})
 
 	t.Run("deve retornar erro quando ID é inválido", func(t *testing.T) {
-		router := mux.NewRouter()
-		router.HandleFunc("/api/produtos/{id}", handler.GetProduto).Methods("GET")
-		
 		req := httptest.NewRequest("GET", "/api/produtos/invalid", nil)
-		w := httptest.NewRecorder()
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath("/api/produtos/:id")
+		c.SetParamNames("id")
+		c.SetParamValues("invalid")
 
-		router.ServeHTTP(w, req)
+		handler.GetProduto(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Status esperado %d, obtido %d", http.StatusBadRequest, w.Code)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Status esperado %d, obtido %d", http.StatusBadRequest, rec.Code)
 		}
 	})
 }
@@ -205,6 +218,7 @@ func TestProdutoHandler_GetProduto(t *testing.T) {
 func TestProdutoHandler_GetProdutos(t *testing.T) {
 	mockService := NewMockProdutoService()
 	handler := NewProdutoHandler(mockService)
+	e := echo.New()
 
 	// Criar produtos de teste
 	mockService.Create(context.Background(), model.Produto{
@@ -218,16 +232,20 @@ func TestProdutoHandler_GetProdutos(t *testing.T) {
 
 	t.Run("deve retornar lista de produtos", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/produtos", nil)
-		w := httptest.NewRecorder()
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
 
-		handler.GetProdutos(w, req)
+		err := handler.GetProdutos(c)
+		if err != nil {
+			t.Fatalf("Erro inesperado: %v", err)
+		}
 
-		if w.Code != http.StatusOK {
-			t.Errorf("Status esperado %d, obtido %d", http.StatusOK, w.Code)
+		if rec.Code != http.StatusOK {
+			t.Errorf("Status esperado %d, obtido %d", http.StatusOK, rec.Code)
 		}
 
 		var response dto.ProdutoListResponse
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 			t.Fatalf("Erro ao decodificar resposta: %v", err)
 		}
 

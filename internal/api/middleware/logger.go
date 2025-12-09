@@ -1,63 +1,53 @@
 package middleware
 
 import (
-	"net/http"
 	"time"
+
+	"github.com/labstack/echo/v4"
 
 	"api-go-arquitetura/internal/logger"
 )
 
-// responseWriter é um wrapper para http.ResponseWriter que captura o status code
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
-
-func newResponseWriter(w http.ResponseWriter) *responseWriter {
-	return &responseWriter{w, http.StatusOK}
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
-
 // LoggingMiddleware registra solicitações com método, path, remote addr, status e duração
-func LoggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rw := newResponseWriter(w)
-		
-		// Obter request ID do contexto
-		requestID := GetRequestID(r)
-		
-		// Log da requisição recebida
-		logFields := map[string]interface{}{
-			"method":      r.Method,
-			"path":        r.URL.Path,
-			"remote_addr": r.RemoteAddr,
-			"user_agent":  r.UserAgent(),
+func LoggingMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			start := time.Now()
+			
+			// Obter request ID do contexto
+			requestID := GetRequestID(c)
+			
+			// Log da requisição recebida
+			logFields := map[string]interface{}{
+				"method":      c.Request().Method,
+				"path":        c.Request().URL.Path,
+				"remote_addr": c.Request().RemoteAddr,
+				"user_agent":  c.Request().UserAgent(),
+			}
+			if requestID != "" {
+				logFields["request_id"] = requestID
+			}
+			logger.WithFields(logFields).Info("Request received")
+			
+			err := next(c)
+			
+			dur := time.Since(start)
+			statusCode := c.Response().Status
+			
+			// Log da resposta
+			responseFields := map[string]interface{}{
+				"method":      c.Request().Method,
+				"path":        c.Request().URL.Path,
+				"status_code": statusCode,
+				"duration_ms": dur.Milliseconds(),
+				"duration":    dur.String(),
+			}
+			if requestID != "" {
+				responseFields["request_id"] = requestID
+			}
+			logger.WithFields(responseFields).Info("Request completed")
+			
+			return err
 		}
-		if requestID != "" {
-			logFields["request_id"] = requestID
-		}
-		logger.WithFields(logFields).Info("Request received")
-		
-		next.ServeHTTP(rw, r)
-		
-		dur := time.Since(start)
-		
-		// Log da resposta
-		responseFields := map[string]interface{}{
-			"method":      r.Method,
-			"path":        r.URL.Path,
-			"status_code": rw.statusCode,
-			"duration_ms": dur.Milliseconds(),
-			"duration":    dur.String(),
-		}
-		if requestID != "" {
-			responseFields["request_id"] = requestID
-		}
-		logger.WithFields(responseFields).Info("Request completed")
-	})
+	}
 }
