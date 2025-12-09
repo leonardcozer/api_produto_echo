@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-go-arquitetura
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MONGO_URI=mongodb://172.30.0.45:27017
+      - LOKI_URL=http://10.110.0.239:3100/loki/api/v1/push
+      - LOKI_JOB=ARQUITETURA
+      - LOG_FORMAT=json
+      - LOG_LEVEL=info
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
