@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: api-go-arquitetura
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
-      - PORT=8080
+      - PORT=8081
       - MONGO_URI=mongodb://172.30.0.45:27017
       - LOKI_URL=http://10.110.0.239:3100/loki/api/v1/push
       - LOKI_JOB=ARQUITETURA

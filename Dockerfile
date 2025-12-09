@@ -27,7 +27,7 @@ WORKDIR /root/
 COPY --from=builder /app/api-go-arquitetura .
 
 # Expor porta
-EXPOSE 8080
+EXPOSE 8081
 
 # Comando para executar a aplicação
 CMD ["./api-go-arquitetura"]
