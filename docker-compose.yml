@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: api-go-arquitetura
+    container_name: api-produto-go-echo
     ports:
       - "8081:8081"
     environment:
